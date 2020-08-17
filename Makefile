@@ -3,6 +3,7 @@
 #CXX SOURCE_FILES
 CXX_SOURCES = main.cpp
 CXX_SOURCES += I2C.cpp
+CXX_SOURCES += clockconfig.cpp
 
 #C SOURCE FILES
 #SOURCES  = main.c
