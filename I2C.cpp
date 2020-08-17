@@ -82,8 +82,14 @@ I2C_::I2C_(I2C_TypeDef *_I2C,
 
 	//SET CLOCK CONTROL REGISTER IN Fm/Sm
 	int I2C_FREQUENCY = 0;
-	if(mode == standard) I2C_FREQUENCY = 100;
-	if(mode == fast) I2C_FREQUENCY = 400;
+	if(mode == standard){
+		I2C_FREQUENCY = 100;
+		_I2C->CCR &= ~I2C_CCR_FS;
+	} 
+	if(mode == fast) {
+		_I2C->CCR |= I2C_CCR_FS;
+		I2C_FREQUENCY = 400;
+	}
 
 	float I2C_PERIOD = (1/I2C_FREQUENCY);
 	double APB_BUS_PERIOD = (1/APB1_FREQ);
@@ -102,7 +108,7 @@ I2C_::I2C_(I2C_TypeDef *_I2C,
 
 void I2C_::read_bytes(uint8_t address,uint8_t *buffer,uint8_t len){
 		uint32_t temp = 0;
-		RCC->AHBENR |= RCC_AHBENR_DMA1EN;
+		RCC->AHB1ENR |= RCC_AHB1ENR_DMA1EN;
 		//ENABLE I2C DMA
 		_I2C->CR2 |= I2C_CR2_DMAEN;
 		//ENABLE ACKS
@@ -110,18 +116,30 @@ void I2C_::read_bytes(uint8_t address,uint8_t *buffer,uint8_t len){
 		_I2C->CR2 |= I2C_CR2_LAST;
 		//CONFIGURE DMA
 		if(_I2C == I2C1){
-			DMA1_Channel7 ->CMAR = (uint32_t) buffer;
-			DMA1_Channel7 -> CPAR = (uint32_t) &I2C1->DR;
-			DMA1_Channel7->CNDTR = len;
-			DMA1_Channel7 ->CCR |= DMA_CCR7_TCIE | DMA_CCR7_MINC | DMA_CCR7_EN | DMA_CCR7_CIRC;
+			DMA1_Stream0->CR |= DMA_SxCR_CHSEL_1;
+			DMA1_Stream0->M0AR = (uint32_t) buffer;
+			DMA1_Stream0->PAR = (uint32_t) &_I2C->DR;
+			DMA1_Stream0->NDTR = len;
+			DMA1_Stream0->CR |= DMA_SxCR_TCIE| DMA_SxCR_MINC | DMA_SxCR_EN | DMA_SxCR_CIRC;
 		}
 
 		if(_I2C == I2C2){
-			DMA1_Channel5 ->CMAR = (uint32_t) buffer;
-			DMA1_Channel5 -> CPAR = (uint32_t) &I2C1->DR;
-			DMA1_Channel5->CNDTR = len;
-			DMA1_Channel5 ->CCR |= DMA_CCR5_TCIE | DMA_CCR5_MINC | DMA_CCR5_EN | DMA_CCR5_CIRC;
+			DMA1_Stream2->CR |= (7<<25);
+			DMA1_Stream2->M0AR = (uint32_t) buffer;
+			DMA1_Stream2->PAR = (uint32_t) &_I2C->DR;
+			DMA1_Stream2->NDTR = len;
+			DMA1_Stream2->CR |= DMA_SxCR_TCIE| DMA_SxCR_MINC | DMA_SxCR_EN | DMA_SxCR_CIRC;
 		}
+		
+		if (_I2C == I2C3)
+		{
+			DMA1_Stream2->CR |= (3<<25);
+			DMA1_Stream2->M0AR = (uint32_t) buffer;
+			DMA1_Stream2->PAR = (uint32_t) &_I2C->DR;
+			DMA1_Stream2->NDTR = len;
+			DMA1_Stream2->CR |= DMA_SxCR_TCIE| DMA_SxCR_MINC | DMA_SxCR_EN | DMA_SxCR_CIRC;
+		}
+		
 
 		//SEND START BIT
 		_I2C->CR1 |= I2C_CR1_START;
@@ -135,15 +153,21 @@ void I2C_::read_bytes(uint8_t address,uint8_t *buffer,uint8_t len){
 
 		if(_I2C == I2C1){
 			//WAIT UNTIL DMA TRANFER IS COMPLETE
-			while((DMA1->ISR & DMA_ISR_TCIF7) == 0){}
+			while((DMA1->LISR & DMA_LISR_TCIF0) == 0){}
 			//CLEAR TRANSFER COMPLETE FLAG
-			DMA1->IFCR |= DMA_IFCR_CTCIF7;
+			DMA1->LIFCR |= DMA_LIFCR_CTCIF0;
 		}
 		if(_I2C == I2C2){
 			//WAIT UNTIL DMA TRANFER IS COMPLETE
-			while((DMA1->ISR & DMA_ISR_TCIF5) == 0){}
+			while((DMA1->LISR & DMA_LISR_TCIF2) == 0){}
 			//CLEAR TRANSFER COMPLETE FLAG
-			DMA1->IFCR |= DMA_IFCR_CTCIF5;
+			DMA1->LIFCR |= DMA_LIFCR_CTCIF2;
+		}
+		if(_I2C == I2C3){
+			//WAIT UNTIL DMA TRANFER IS COMPLETE
+			while((DMA1->LISR & DMA_LISR_TCIF2) == 0){}
+			//CLEAR TRANSFER COMPLETE FLAG
+			DMA1->LIFCR |= DMA_LIFCR_CTCIF2;
 		}
 
 		//SEND STOP BIT
