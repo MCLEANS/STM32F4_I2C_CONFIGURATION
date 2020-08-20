@@ -55,24 +55,24 @@ I2C_::I2C_(I2C_TypeDef *_I2C,
 
 	//ENABLE PULLUP
 	GPIO->PUPDR |= (1<<(SCL*2));
-	GPIO->PUPDR &= (1<<((SCL*2)+1));
+	GPIO->PUPDR &= ~(1<<((SCL*2)+1));
 
 	GPIO->PUPDR |= (1<<(SDA*2));
-	GPIO->PUPDR &= (1<<((SDA*2)+1));
+	GPIO->PUPDR &= ~(1<<((SDA*2)+1));
 
 	//ENABLE ACTUAL ALTERNATE FUNCTION
 	if(SDA < 8){
 		GPIO->AFR[0] |= (4 << (SDA*4));
 	}
 	else{
-		GPIO->AFR[1] |= (4 << (SDA*4));
+		GPIO->AFR[1] |= (4 << ((SDA-8)*4));
 	}
 
 	if(SCL < 8){
-		GPIO->AFR[0] |= (4 << (SDA*4));
+		GPIO->AFR[0] |= (4 << (SCL*4));
 	}
 	else{
-		GPIO->AFR[1] |= (4 << (SDA*4));
+		GPIO->AFR[1] |= (4 << ((SCL-8)*4));
 	}
 
 	//SET PERIPHERAL CLOCK REQUENCY FOR I2C (I2C IS ON APB1 AT 36MHz)
@@ -94,11 +94,11 @@ I2C_::I2C_(I2C_TypeDef *_I2C,
 	double APB_BUS_PERIOD = (1/APB1_FREQ);
 
 	int CCR_VALUE = ((I2C_PERIOD/2)/APB_BUS_PERIOD);
-	_I2C->CCR |= CCR_VALUE;
+	_I2C->CCR |= 210;
 
 	//SET I2C RISE TIME
 	signed long  RISE_TIME =(((1/1000000)/APB_BUS_PERIOD)+1);
-	_I2C->TRISE = RISE_TIME;
+	_I2C->TRISE = 43;
 
 	//ENABLE THE PERIPHERAL, MUST BE DONE LAST
 	_I2C->CR1 |= I2C_CR1_PE;
@@ -113,6 +113,7 @@ void I2C_::read_bytes(uint8_t address,uint8_t *buffer,uint8_t len){
 		//ENABLE ACKS
 		_I2C->CR1 |= I2C_CR1_ACK;
 		_I2C->CR2 |= I2C_CR2_LAST;
+		
 		//CONFIGURE DMA
 		if(_I2C == I2C1){
 			DMA1_Stream0->CR |= DMA_SxCR_CHSEL_1;
@@ -229,7 +230,7 @@ void I2C_::write_memp(uint8_t address,uint8_t mem){
 	//GENERATE START CONDITION
 	_I2C->CR1 |= I2C_CR1_START;
 	//WAIT UNTIL START BIT IS SENT
-	while(!(_I2C->SR1 & I2C_SR1_SB)){};
+	while(!(_I2C->SR1 & I2C_SR1_SB)){}
 	//SEND ADDRESS
 	_I2C->DR = address;
 	//WAIT UNTIL ADDRESS IS SENT

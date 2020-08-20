@@ -12,8 +12,8 @@
 
 namespace custom_libraries {
 
-#define APB1_FREQ 36
-#define APB2_FREQ 72
+#define APB1_FREQ 42
+#define APB2_FREQ 84
 
 enum Mode{
 	standard, //100KHz
