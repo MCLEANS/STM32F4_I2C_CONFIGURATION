@@ -43,6 +43,13 @@ I2C_::I2C_(I2C_TypeDef *_I2C,
 	if(GPIO == GPIOF) RCC->AHB1ENR |= RCC_AHB1ENR_GPIOFEN;
 
 
+	///SET I2C PINS TO ALTERNATE OPEN DRAIN AND ENABLE PULL_UP
+	GPIO->MODER &= ~(1<<(SCL*2));
+	GPIO->MODER |= (1<<((SCL*2)+1));
+
+	GPIO->MODER &= ~(1<<(SDA*2));
+	GPIO->MODER |= (1<<((SDA*2)+1));
+
 	//SET TO OUTPUT OPEN DRAIN
 	GPIO->OTYPER |= (1<<SCL);
 	GPIO->OTYPER |= (1<<SDA);
@@ -54,12 +61,12 @@ I2C_::I2C_(I2C_TypeDef *_I2C,
 	GPIO->PUPDR |= (1<<(SDA*2));
 	GPIO->PUPDR &= ~(1<<((SDA*2)+1));
 
-	///SET I2C PINS TO ALTERNATE OPEN DRAIN AND ENABLE PULL_UP
-	GPIO->MODER &= ~(1<<(SCL*2));
-	GPIO->MODER |= (1<<((SCL*2)+1));
+	GPIO->OSPEEDR |= (1<<(SCL*2));
+	GPIO->OSPEEDR |= (1<<((SCL*2)+1));
 
-	GPIO->MODER &= ~(1<<(SDA*2));
-	GPIO->MODER |= (1<<((SDA*2)+1));
+	GPIO->OSPEEDR |= (1<<(SDA*2));
+	GPIO->OSPEEDR |= (1<<((SDA*2)+1));
+
 
 	//ENABLE ACTUAL ALTERNATE FUNCTION
 	if(SDA < 8){
@@ -69,10 +76,10 @@ I2C_::I2C_(I2C_TypeDef *_I2C,
 		GPIO->AFR[0] &= ~(1 << ((SDA*4)+3));
 	}
 	else{
-		GPIO->AFR[1] &= ~(4 << ((SDA-8)*4));
-		GPIO->AFR[1] &= ~(4 << (((SDA-8)*4)+1));
-		GPIO->AFR[1] |= (4 << (((SDA-8)*4)+2));
-		GPIO->AFR[1] &= ~(4 << (((SDA-8)*4)+3));
+		GPIO->AFR[1] &= ~(1 << ((SDA-8)*4));
+		GPIO->AFR[1] &= ~(1 << (((SDA-8)*4)+1));
+		GPIO->AFR[1] |= (1 << (((SDA-8)*4)+2));
+		GPIO->AFR[1] &= ~(1 << (((SDA-8)*4)+3));
 	}
 
 	if(SCL < 8){
@@ -82,10 +89,10 @@ I2C_::I2C_(I2C_TypeDef *_I2C,
 		GPIO->AFR[0] &= ~(1 << ((SCL*4)+3));
 	}
 	else{
-		GPIO->AFR[1] &= ~(4 << ((SCL-8)*4));
-		GPIO->AFR[1] &= ~(4 << (((SCL-8)*4)+1));
-		GPIO->AFR[1] |= (4 << (((SCL-8)*4)+2));
-		GPIO->AFR[1] &= ~(4 << (((SCL-8)*4)+3));
+		GPIO->AFR[1] &= ~(1 << ((SCL-8)*4));
+		GPIO->AFR[1] &= ~(1 << (((SCL-8)*4)+1));
+		GPIO->AFR[1] |= (1 << (((SCL-8)*4)+2));
+		GPIO->AFR[1] &= ~(1 << (((SCL-8)*4)+3));
 	}
 
 	//SET PERIPHERAL CLOCK REQUENCY FOR I2C (I2C IS ON APB1 AT 36MHz)
@@ -93,13 +100,13 @@ I2C_::I2C_(I2C_TypeDef *_I2C,
 	_I2C->CR2 |= APB1_FREQ;
 
 	//SET CLOCK CONTROL REGISTER IN Fm/Sm
-	int I2C_FREQUENCY = 0;
+	int I2C_FREQUENCY;
 	if(mode == standard){
 		I2C_FREQUENCY = 100;
-		//_I2C->CCR &= ~I2C_CCR_FS;
+		_I2C->CCR &= ~I2C_CCR_FS;
 	} 
 	if(mode == fast) {
-		//_I2C->CCR |= I2C_CCR_FS;
+		_I2C->CCR |= I2C_CCR_FS;
 		I2C_FREQUENCY = 400;
 	}
 
@@ -111,7 +118,7 @@ I2C_::I2C_(I2C_TypeDef *_I2C,
 
 	//SET I2C RISE TIME
 	signed long  RISE_TIME =(((1/1000000)/APB_BUS_PERIOD)+1);
-	_I2C->TRISE = RISE_TIME; //43
+	_I2C->TRISE = 43; //43
 
 	//ENABLE THE PERIPHERAL, MUST BE DONE LAST
 	_I2C->CR1 |= I2C_CR1_PE;
