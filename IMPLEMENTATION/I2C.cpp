@@ -29,11 +29,6 @@ I2C_::I2C_(I2C_TypeDef *_I2C,
 	_I2C->CR2 = 0x00;
 	_I2C->CR1 = 0x00;
 
-	//ENABLE I2C RCC
-	if(_I2C == I2C1) RCC->APB1ENR |= RCC_APB1ENR_I2C1EN;
-	if(_I2C == I2C2) RCC->APB1ENR |= RCC_APB1ENR_I2C2EN;
-	if(_I2C == I2C3) RCC->APB1ENR |= RCC_APB1ENR_I2C3EN;
-
 	//ENABLE GPIO RCC
 	if(GPIO == GPIOA) RCC->AHB1ENR |= RCC_AHB1ENR_GPIOAEN;
 	if(GPIO == GPIOB) RCC->AHB1ENR |= RCC_AHB1ENR_GPIOBEN;
@@ -43,6 +38,13 @@ I2C_::I2C_(I2C_TypeDef *_I2C,
 	if(GPIO == GPIOF) RCC->AHB1ENR |= RCC_AHB1ENR_GPIOFEN;
 
 
+	//ENABLE I2C RCC
+	if(_I2C == I2C1) RCC->APB1ENR |= RCC_APB1ENR_I2C1EN;
+	if(_I2C == I2C2) RCC->APB1ENR |= RCC_APB1ENR_I2C2EN;
+	if(_I2C == I2C3) RCC->APB1ENR |= RCC_APB1ENR_I2C3EN;
+
+
+
 	///SET I2C PINS TO ALTERNATE OPEN DRAIN AND ENABLE PULL_UP
 	GPIO->MODER &= ~(1<<(SCL*2));
 	GPIO->MODER |= (1<<((SCL*2)+1));
@@ -50,25 +52,7 @@ I2C_::I2C_(I2C_TypeDef *_I2C,
 	GPIO->MODER &= ~(1<<(SDA*2));
 	GPIO->MODER |= (1<<((SDA*2)+1));
 
-	//SET TO OUTPUT OPEN DRAIN
-	GPIO->OTYPER |= (1<<SCL);
-	GPIO->OTYPER |= (1<<SDA);
-
-	//ENABLE PULLUP
-	GPIO->PUPDR |= (1<<(SCL*2));
-	GPIO->PUPDR &= ~(1<<((SCL*2)+1));
-
-	GPIO->PUPDR |= (1<<(SDA*2));
-	GPIO->PUPDR &= ~(1<<((SDA*2)+1));
-
-	GPIO->OSPEEDR |= (1<<(SCL*2));
-	GPIO->OSPEEDR |= (1<<((SCL*2)+1));
-
-	GPIO->OSPEEDR |= (1<<(SDA*2));
-	GPIO->OSPEEDR |= (1<<((SDA*2)+1));
-
-
-	//ENABLE ACTUAL ALTERNATE FUNCTION
+		//ENABLE ACTUAL ALTERNATE FUNCTION
 	if(SDA < 8){
 		GPIO->AFR[0] &= ~(1 << (SDA*4));
 		GPIO->AFR[0] &= ~(1 << ((SDA*4)+1));
@@ -95,6 +79,29 @@ I2C_::I2C_(I2C_TypeDef *_I2C,
 		GPIO->AFR[1] &= ~(1 << (((SCL-8)*4)+3));
 	}
 
+	//SET TO OUTPUT OPEN DRAIN
+	GPIO->OTYPER |= (1<<SCL);
+	GPIO->OTYPER |= (1<<SDA);
+
+	//ENABLE PULLUP
+	GPIO->PUPDR |= (1<<(SCL*2));
+	GPIO->PUPDR &= ~(1<<((SCL*2)+1));
+
+	GPIO->PUPDR |= (1<<(SDA*2));
+	GPIO->PUPDR &= ~(1<<((SDA*2)+1));
+
+	GPIO->OSPEEDR |= (1<<(SCL*2));
+	GPIO->OSPEEDR |= (1<<((SCL*2)+1));
+
+	GPIO->OSPEEDR |= (1<<(SDA*2));
+	GPIO->OSPEEDR |= (1<<((SDA*2)+1));
+
+
+
+
+	//SET SOFTWARE RESET
+	_I2C->CR1 |= I2C_CR1_SWRST;
+	_I2C->CR1 &= ~I2C_CR1_SWRST;
 	//SET PERIPHERAL CLOCK REQUENCY FOR I2C (I2C IS ON APB1 AT 36MHz)
 	//CHANGE THIS TO THE CLOCK FREQUENCY OF YOUR APB1 BUS
 	_I2C->CR2 |= APB1_FREQ;
@@ -118,7 +125,7 @@ I2C_::I2C_(I2C_TypeDef *_I2C,
 
 	//SET I2C RISE TIME
 	signed long  RISE_TIME =(((1/1000000)/APB_BUS_PERIOD)+1);
-	_I2C->TRISE = 43; //43
+	_I2C->TRISE = RISE_TIME; //43
 
 	//ENABLE THE PERIPHERAL, MUST BE DONE LAST
 	_I2C->CR1 |= I2C_CR1_PE;
@@ -126,7 +133,6 @@ I2C_::I2C_(I2C_TypeDef *_I2C,
 }
 
 void I2C_::read_bytes(uint8_t address,uint8_t *buffer,uint8_t len){
-		uint32_t temp = 0;
 		RCC->AHB1ENR |= RCC_AHB1ENR_DMA1EN;
 		//ENABLE I2C DMA
 		_I2C->CR2 |= I2C_CR2_DMAEN;
@@ -169,7 +175,7 @@ void I2C_::read_bytes(uint8_t address,uint8_t *buffer,uint8_t len){
 		_I2C->DR = address+1;
 		//WAIT FOR ADDRESS TO BE SENT
 		while(!(_I2C->SR1 & I2C_SR1_ADDR)){}
-		temp = I2C1->SR2;
+		(void)_I2C->SR2;
 
 		if(_I2C == I2C1){
 			//WAIT UNTIL DMA TRANFER IS COMPLETE
@@ -195,7 +201,8 @@ void I2C_::read_bytes(uint8_t address,uint8_t *buffer,uint8_t len){
 }
 
 void I2C_::write_byte(uint8_t address,uint8_t mem,uint8_t data){
-	uint32_t temp;
+	//CHECK THAT LINE IS NOT BUSY
+	while(_I2C->SR2 & I2C_SR2_BUSY){}
 	//GENERATE START CONDITION
 	_I2C->CR1 |= I2C_CR1_START;
 	//WAIT UNTIL START BIT IS SENT
@@ -205,7 +212,7 @@ void I2C_::write_byte(uint8_t address,uint8_t mem,uint8_t data){
 	//WAIT UNTIL ADDRESS IS SENT
 	while(!(_I2C->SR1 & I2C_SR1_ADDR)){}
 	//READ SR1 AND SR2 TO CLEAR THE BIT
-	temp = _I2C->SR2;
+	(void)_I2C->SR2;
 	//ADDRESS TO WRITE TO
 	_I2C->DR = mem;
 	//WAIT FOR TRANSFER TO COMPLETE
@@ -219,7 +226,8 @@ void I2C_::write_byte(uint8_t address,uint8_t mem,uint8_t data){
 }
 
 void I2C_::write_bytes(uint8_t address,uint8_t mem,uint8_t *data,uint16_t len){
-	uint32_t temp;
+	//CHECK THAT LINE IS NOT BUSY
+	while(_I2C->SR2 & I2C_SR2_BUSY){}
 	//GENERATE START CONDITION
 	_I2C->CR1 |= I2C_CR1_START;
 	//WAIT UNTIL START BIT IS SENT
@@ -229,7 +237,7 @@ void I2C_::write_bytes(uint8_t address,uint8_t mem,uint8_t *data,uint16_t len){
 	//WAIT UNTIL ADDRESS IS SENT
 	while(!(_I2C->SR1 & I2C_SR1_ADDR)){}
 	//READ SR1 AND SR2 TO CLEAR THE BIT
-	temp = _I2C->SR2;
+	(void) _I2C->SR2;
 	//ADDRESS TO WRITE TO
 	_I2C->DR = mem;
 	//WAIT FOR TRANSFER TO COMPLETE
@@ -246,7 +254,9 @@ void I2C_::write_bytes(uint8_t address,uint8_t mem,uint8_t *data,uint16_t len){
 }
 
 void I2C_::write_memp(uint8_t address,uint8_t mem){
-	uint32_t temp;
+	//volatile uint32_t temp;
+	//CHECK THAT LINE IS NOT BUSY
+	while(_I2C->SR2 & I2C_SR2_BUSY){}
 	//GENERATE START CONDITION
 	_I2C->CR1 |= I2C_CR1_START;
 	//WAIT UNTIL START BIT IS SENT
@@ -256,14 +266,13 @@ void I2C_::write_memp(uint8_t address,uint8_t mem){
 	//WAIT UNTIL ADDRESS IS SENT
 	while(!(_I2C->SR1 & I2C_SR1_ADDR)){}
 	//READ SR1 AND SR2 TO CLEAR THE BIT
-	temp = _I2C->SR2;
+	(void) _I2C->SR2;
 	//ADDRESS TO WRITE TO
 	_I2C->DR = mem;
 	//WAIT FOR TRANSFER TO COMPLETE
 	while(!(_I2C->SR1 & I2C_SR1_TXE)){}
 	//SET STOP BIT
 	_I2C->CR1 |= I2C_CR1_STOP;
-
 }
 
 uint8_t I2C_::BCD_to_decimal(uint8_t val){
